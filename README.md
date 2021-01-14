@@ -1,3 +1,5 @@
+not run webcam_demo_colab.py
+
 ## PoseNet Python
 
 This repository contains a pure Python implementation (multi-pose only) of the Google TensorFlow.js Posenet model. For a (slightly faster) PyTorch implementation that followed from this, see (https://github.com/rwightman/posenet-pytorch)
