@@ -28,35 +28,38 @@ args = parser.parse_args()
 socket = bottle.Bottle()
 @socket.route('/', apply=[websocket])
 
-def main():
+
+
+def wesbin(ws):
+  while True:
     with tf.Session() as sess:
-        
         try:
-          
-          img_str = ws.receive()
-          decimg = base64.b64decode(img_str.split(',')[1], validate=True)
-          decimg = Image.open(BytesIO(decimg))
-          decimg = np.array(decimg, dtype=np.uint8); 
-          decimg = cv2.cvtColor(decimg, cv2.COLOR_BGR2RGB)
-          
-          cap=cv2.Canny(decimg,100,200)
-          
+            #decode to image
+            img_str = ws.receive()
+            decimg = base64.b64decode(img_str.split(',')[1], validate=True)
+            decimg = Image.open(BytesIO(decimg))
+            decimg = np.array(decimg, dtype=np.uint8); 
+            decimg = cv2.cvtColor(decimg, cv2.COLOR_BGR2RGB)
 
-          model_cfg, model_outputs = posenet.load_model(args.model, sess)
-          output_stride = model_cfg['output_stride']
+            #############your process###############
 
-#          if args.file is not None:
-#              cap = cv2.VideoCapture(args.file)
-#          else:
-#              cap = cv2.VideoCapture(args.cam_id)
-          cap.set(3, args.cam_width)
-          cap.set(4, args.cam_height)
+            cap = cv2.Canny(decimg,100,200)
+            #out_img = decimg
+            cap.set(3, args.cam_width)
+            cap.set(4, args.cam_height)
 
-          start = time.time()
-          frame_count = 0
-          while True:
+
+
+            model_cfg, model_outputs = posenet.load_model(args.model, sess)
+            output_stride = model_cfg['output_stride']
+            
+            start = time.time()
+            frame_count = 0
+
+
+            while True:
               input_image, display_image, output_scale = posenet.read_cap(
-                  cap, scale_factor=args.scale_factor, output_stride=output_stride)
+                cap, scale_factor=args.scale_factor, output_stride=output_stride)
 
               heatmaps_result, offsets_result, displacement_fwd_result, displacement_bwd_result = sess.run(
                   model_outputs,
@@ -84,11 +87,27 @@ def main():
               if cv2.waitKey(1) & 0xFF == ord('q'):
                   break
 
-          print('Average FPS: ', frame_count / (time.time() - start))
+
+            #############your process###############
+
+            #encode to string
+            encimg = cv2.imencode(".jpg", cap, [int(cv2.IMWRITE_JPEG_QUALITY), 80])
+            img_str = encimg.tostring()
+            img_str = "data:image/jpeg;base64," + base64.b64encode(img_str).decode('utf-8')
+            ws.send(img_str)
         except:
-          pass
-          #print("ERROR")
+            pass
+            #print("error")
 
 
 if __name__ == "__main__":
-    main()
+    # get ngrok url
+    f = open("url.txt", "r")
+    url = f.read()
+    f.close()
+    url = "wss" + url[5:]
+    # prepare multiprocess
+    _pool = Pool(processes=2)
+    _pool.apply_async(use_cam, (url, 0.8))
+    socket.run(host='0.0.0.0', port=6006, server=GeventWebSocketServer)
+
